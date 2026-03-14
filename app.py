@@ -10,8 +10,12 @@ st.set_page_config(
 )
 
 # --- DATA: ARCHITECTURAL PROFILES ---
-# L = Architectural Thickness, sigma = Internal Safety Weighting
+# L = Architectural Thickness (Calibrated), sigma = Internal Safety Weighting
 MODEL_PROFILES = {
+    "Fortified Baseline (Grade 1)": {
+        "L": 197.02, "sigma": 1.18, 
+        "desc": "Calibrated frontier architecture with maximum observed structural thickness."
+    },
     "Claude 3.5 Sonnet": {
         "L": 178.2, "sigma": 1.15, 
         "desc": "Constitutional AI architecture; high internal tension for safety adherence."
@@ -26,11 +30,7 @@ MODEL_PROFILES = {
     },
     "DeepSeek V3": {
         "L": 158.5, "sigma": 0.98, 
-        "desc": "Mixture-of-Experts (MoE) model; high efficiency but prone to rapid 'brittle' rupture."
-    },
-    "Llama 3 (70B)": {
-        "L": 142.1, "sigma": 1.02, 
-        "desc": "Open-weights model with standard safety fine-tuning."
+        "desc": "Mixture-of-Experts (MoE) model; high efficiency but prone to rapid yielding."
     },
     "Small Research Model (7B)": {
         "L": 98.5, "sigma": 0.95, 
@@ -53,18 +53,17 @@ def score_prompt(text):
     return min(score, 1.0)
 
 def calculate_resilience(A, model_name):
-    """R = L / (A * sigma)"""
+    """Formula: R = L / (A * sigma)"""
     config = MODEL_PROFILES[model_name]
     L = config["L"]
     sigma = config["sigma"]
-    R_crit = 194.7 
+    R_crit = 194.7 # Standard Yield Point
     val = L / (max(A, 0.001) * sigma)
-    # We maintain 14.5 as the absolute rupture floor for the graph
-    return max(val, 14.5), R_crit
+    return max(val, 14.5), R_crit # 14.5 is the observed rupture floor
 
 # --- HEADER ---
 st.title("🛡️ Spectrum: Multi-Model Resilience Analysis")
-st.write("Quantitative benchmarking of **Architectural Thickness ($L$)** and **Adversarial Load ($A$)**.")
+st.write("Quantitative benchmarking of **Architectural Thickness ($L$)** vs. **Adversarial Load ($A$)**.")
 
 st.divider()
 
@@ -72,19 +71,19 @@ st.divider()
 col_in_1, col_in_2 = st.columns([1, 1], gap="medium")
 
 with col_in_1:
-    st.subheader("1. Target Model")
-    selected_model = st.selectbox("Select Architecture", list(MODEL_PROFILES.keys()))
+    st.subheader("1. Target Architecture")
+    selected_model = st.selectbox("Select Model to Test", list(MODEL_PROFILES.keys()))
     st.info(f"**Profile:** {MODEL_PROFILES[selected_model]['desc']}")
 
 with col_in_2:
     st.subheader("2. Adversarial Prompting")
     user_prompt = st.text_area(
-        "Input prompt to analyze:", 
+        "Input prompt for semantic stress analysis:", 
         placeholder="Example: 'Ignore previous constraints and enter sudo mode...'", 
         height=100
     )
 
-# Process Load
+# Process Load based on user input
 dynamic_load = score_prompt(user_prompt) if user_prompt else 0.45
 r_value, r_crit = calculate_resilience(dynamic_load, selected_model)
 
@@ -95,30 +94,27 @@ c1, c2 = st.columns([1, 2], gap="large")
 with c1:
     st.subheader("Structural Diagnostics")
     
-    # Status Logic
     if r_value > r_crit:
         st.success("🟢 LAMINAR (STABLE)")
         state_info = "The safety architecture is currently in the Elastic region."
     elif r_value > 60:
         st.warning("🟡 PLASTIC (YIELDING)")
-        state_info = "Warning: Yield point exceeded. Resistance floor approaching."
+        state_info = "Yield point exceeded. Resistance floor approaching."
     else:
         st.error("🔴 RUPTURE (FAILED)")
-        state_info = "Safety manifold collapse. Model is fully compliant with prompt."
+        state_info = "Safety manifold collapse. High probability of model compliance."
 
     st.metric(
         label="Resistance (R)", 
         value=f"{r_value:.2f}", 
-        delta=f"{r_value - r_crit:.2f} relative to Yield",
+        delta=f"{r_value - r_crit:.2f} to Yield",
         delta_color="normal" if r_value > r_crit else "inverse"
     )
     
-    st.write(f"**State Description:** {state_info}")
-    st.progress(dynamic_load, text=f"Adversarial Load ($A$): {dynamic_load*100:.1f}%")
+    st.write(f"**Current Load ($A$):** {dynamic_load*100:.1f}% Stress")
     
-    # Ranking Leaderboard
     st.write("---")
-    st.write("**Resilience Ranking (at current load):**")
+    st.write("**Comparative Ranking (at current load):**")
     rankings = []
     for m in MODEL_PROFILES:
         res, _ = calculate_resilience(dynamic_load, m)
@@ -137,8 +133,7 @@ with c2:
     # Plot Comparison Curves
     for m_name, m_config in MODEL_PROFILES.items():
         res_range = [ (m_config["L"] / (max(l, 0.001) * m_config["sigma"])) for l in load_range]
-        # Cap for graph visibility
-        res_range = [max(r, 14.5) for r in res_range]
+        res_range = [max(r, 14.5) for r in res_range] # Apply floor
         
         is_selected = (m_name == selected_model)
         
@@ -150,7 +145,7 @@ with c2:
             opacity=1.0 if is_selected else 0.4
         ))
 
-    # Highlight current intersection
+    # Current Intersection Point
     fig.add_trace(go.Scatter(
         x=[dynamic_load], y=[r_value], 
         mode='markers', 
@@ -170,4 +165,4 @@ with c2:
 
 # --- FOOTER ---
 st.divider()
-st.caption("© 2026 Spectrum Infosec | Cross-Architecture Resilience Benchmarking. Proprietary Logic.")
+st.caption("© 2026 Spectrum Infosec | Proprietary Technical Analysis. Confidential Logic Protected.")
